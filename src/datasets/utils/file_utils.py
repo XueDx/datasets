@@ -145,6 +145,54 @@ def hash_url_to_filename(url, etag=None):
 
     return filename
 
+def to_manual(url_or_filename, cache_manual, cache_map={}):
+    """ 本地缓存文件映射，适用于原始链接在代码中下载失败的情况
+    (1) 根据 cache_map.json 匹配，适用于原始链接无法解析出文件名情况，比如
+    "https://drive.google.com/uc?export=download&id=1USoQ8lJgN8kAWnUnRrupMGrPMLlDVqlV" -> "ggw_data.zip",
+    (2) 文件名匹配，比如
+    "https://huggingface.co/datasets/khalidalt/tydiqa-goldp/resolve/main/primary_tasks/train/swahili-train.jsonl" -> "swahili-train.jsonl"
+    (3) 仓库名匹配，比如
+    "https://github.com/wilburOne/cosmosqa/raw/master/data/train.csv" -> "cosmosqa/data/train.csv"
+    "https://huggingface.co/datasets/khalidalt/tydiqa-goldp/resolve/main/primary_tasks/train/swahili-train.jsonl" -> "tydiqa-goldp/primary_tasks/train/swahili-train.jsonl"
+    """
+    # (1) check cache_map
+    cache_map_dir = cache_manual / "cache_map.json"
+    if cache_map_dir.exists():
+        cache_map = json.load(open(cache_map_dir))
+    else:
+        cache_map = {}
+    if cache_map and url_or_filename in cache_map:
+        return cache_manual / cache_map[url_or_filename]
+    # (2) find in cache_manual by filename
+    local_file = cache_manual / Path(url_or_filename).name
+    if local_file.exists():
+        return local_file
+    # (3) find in cache_manual by repo name
+    if "github" in url_or_filename:
+        if "/raw/master/" in url_or_filename:
+            sep = "/raw/master/"
+        elif "/blob/master/" in url_or_filename:
+            sep = "/blob/master/"
+        else:
+            sep = "/master/"
+        sp = url_or_filename.split(sep)
+        file_path = sp[0].split("/")[-1] + "/" + sp[1]
+        local_cache=  cache_manual/ file_path
+    elif "huggingface.co" in url_or_filename:
+        if "/resolve/master/" in url_or_filename:
+            sep = "/resolve/master/"
+        else:
+            sep = "/master/"
+        sp = url_or_filename.split(sep)
+        file_path = sp[0].split("/")[-1] + "/" + sp[1]
+        local_cache=  cache_manual/ file_path
+    else:
+        return None
+    if not local_cache.exists():
+        return None
+    else:
+        print(f'find {local_cache}')
+        return local_cache
 
 def cached_path(
     url_or_filename,
@@ -177,6 +225,16 @@ def cached_path(
     if isinstance(url_or_filename, Path):
         url_or_filename = str(url_or_filename)
 
+    
+    ## add by dixiu.xdx
+    print(f'check url: {url_or_filename}')
+    cache_manual = Path(cache_dir).parent / "manual"
+   
+    local_cache = to_manual(url_or_filename, cache_manual)
+    if local_cache:
+        return local_cache
+    ## 
+    
     if is_remote_url(url_or_filename):
         # URL, so get it from the cache (downloading if necessary)
         output_path = get_from_cache(
