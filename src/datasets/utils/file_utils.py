@@ -145,6 +145,18 @@ def hash_url_to_filename(url, etag=None):
 
     return filename
 
+
+def sep_url(url):
+    """分离 url 中的文件名"""
+    seps = ["/raw/master/", "/blob/master/", "/resolve/master/", "/resolve/main/", "/master/", "/main/"]
+    for sep in seps:
+        if sep in url:
+            sp = url.split(sep)
+            file_path = sp[0].split("/")[-1] + "/" + sp[1]
+            return file_path
+    return url
+
+
 def to_manual(url_or_filename, cache_manual, cache_map={}):
     """ 本地缓存文件映射，适用于原始链接在代码中下载失败的情况
     (1) 根据 cache_map.json 匹配，适用于原始链接无法解析出文件名情况，比如
@@ -169,22 +181,10 @@ def to_manual(url_or_filename, cache_manual, cache_map={}):
         return local_file
     # (3) find in cache_manual by repo name
     if "github" in url_or_filename:
-        if "/raw/master/" in url_or_filename:
-            sep = "/raw/master/"
-        elif "/blob/master/" in url_or_filename:
-            sep = "/blob/master/"
-        else:
-            sep = "/master/"
-        sp = url_or_filename.split(sep)
-        file_path = sp[0].split("/")[-1] + "/" + sp[1]
+        file_path = sep_url(url_or_filename)
         local_cache=  cache_manual/ file_path
     elif "huggingface.co" in url_or_filename:
-        if "/resolve/master/" in url_or_filename:
-            sep = "/resolve/master/"
-        else:
-            sep = "/master/"
-        sp = url_or_filename.split(sep)
-        file_path = sp[0].split("/")[-1] + "/" + sp[1]
+        file_path = sep_url(url_or_filename)
         local_cache=  cache_manual/ file_path
     else:
         return None
